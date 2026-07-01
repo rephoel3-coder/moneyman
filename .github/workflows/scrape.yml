@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - id: normalize-repository-name
-        run: echo "repository=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+        run: echo "repository=$(echo daniel-hauser/moneyman | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
       - id: set-container-image
         run: echo "image=${{ env.REGISTRY }}/${{ steps.normalize-repository-name.outputs.repository }}:${{ github.event.inputs.containerTag || 'latest' }}" >> $GITHUB_OUTPUT
