@@ -7,14 +7,18 @@ jobs:
   scrape:
     runs-on: ubuntu-latest
     steps:
-      - name: Run scraper
+      - name: Write config
         run: |
           printf '%s' "$MONEYMAN_CONFIG" > /tmp/config.json
+          echo "Config file size: $(wc -c < /tmp/config.json) bytes"
+        env:
+          MONEYMAN_CONFIG: ${{ secrets.MONEYMAN_CONFIG }}
+      - name: Run scraper
+        run: |
           docker run --rm \
             -v /tmp/config.json:/tmp/config.json \
             -e MONEYMAN_CONFIG_PATH=/tmp/config.json \
             -e TZ="Asia/Jerusalem" \
             ghcr.io/daniel-hauser/moneyman:latest
         env:
-          MONEYMAN_CONFIG: ${{ secrets.MONEYMAN_CONFIG }}
           TZ: "Asia/Jerusalem"
