@@ -8,11 +8,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run scraper
-        run: >
-          docker run --rm
-          -e MONEYMAN_CONFIG
-          -e TZ
-          ghcr.io/daniel-hauser/moneyman:latest
         env:
           MONEYMAN_CONFIG: ${{ secrets.MONEYMAN_CONFIG }}
           TZ: "Asia/Jerusalem"
+        run: |
+          echo "$MONEYMAN_CONFIG" > /tmp/config.json
+          docker run --rm \
+            -v /tmp/config.json:/config/config.json \
+            -e MONEYMAN_CONFIG_PATH=/config/config.json \
+            -e TZ \
+            ghcr.io/daniel-hauser/moneyman:latest
