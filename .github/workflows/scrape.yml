@@ -12,9 +12,11 @@ jobs:
           MONEYMAN_CONFIG: ${{ secrets.MONEYMAN_CONFIG }}
           TZ: "Asia/Jerusalem"
         run: |
-          echo "$MONEYMAN_CONFIG" > /tmp/config.json
+          cat > /tmp/config.json << 'ENDOFCONFIG'
+          ${{ secrets.MONEYMAN_CONFIG }}
+          ENDOFCONFIG
           docker run --rm \
             -v /tmp/config.json:/config/config.json \
             -e MONEYMAN_CONFIG_PATH=/config/config.json \
-            -e TZ \
+            -e TZ="Asia/Jerusalem" \
             ghcr.io/daniel-hauser/moneyman:latest
