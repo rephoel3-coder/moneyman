@@ -7,14 +7,11 @@ jobs:
   scrape:
     runs-on: ubuntu-latest
     steps:
-      - name: Write config and run scraper
+      - name: Run scraper
         run: |
-          mkdir -p $HOME/moneyman
-          echo "$MONEYMAN_CONFIG" | jq --arg key "$GOOGLE_PRIVATE_KEY" '.storage.googleSheets.serviceAccountPrivateKey = $key' > $HOME/moneyman/config.json
-          echo "Config size: $(wc -c < $HOME/moneyman/config.json) bytes"
+          FULL_CONFIG=$(echo "$MONEYMAN_CONFIG" | jq --arg key "$GOOGLE_PRIVATE_KEY" '.storage.googleSheets.serviceAccountPrivateKey = $key' | jq -c .)
           docker run --rm \
-            -v $HOME/moneyman/config.json:/config.json \
-            -e MONEYMAN_CONFIG_PATH=/config.json \
+            -e MONEYMAN_CONFIG="$FULL_CONFIG" \
             -e TZ="Asia/Jerusalem" \
             ghcr.io/daniel-hauser/moneyman:latest
         env:
