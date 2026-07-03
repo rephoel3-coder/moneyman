@@ -9,10 +9,12 @@ jobs:
     steps:
       - name: Write config
         run: |
-          printf '%s' "$MONEYMAN_CONFIG" > /tmp/config.json
-          echo "Config file size: $(wc -c < /tmp/config.json) bytes"
+          CONFIG=$(echo "$MONEYMAN_CONFIG" | jq --arg key "$GOOGLE_PRIVATE_KEY" '.storage.googleSheets.serviceAccountPrivateKey = $key')
+          echo "$CONFIG" > /tmp/config.json
+          echo "Config size: $(wc -c < /tmp/config.json) bytes"
         env:
           MONEYMAN_CONFIG: ${{ secrets.MONEYMAN_CONFIG }}
+          GOOGLE_PRIVATE_KEY: ${{ secrets.GOOGLE_PRIVATE_KEY }}
       - name: Run scraper
         run: |
           docker run --rm \
@@ -20,5 +22,3 @@ jobs:
             -e MONEYMAN_CONFIG_PATH=/tmp/config.json \
             -e TZ="Asia/Jerusalem" \
             ghcr.io/daniel-hauser/moneyman:latest
-        env:
-          TZ: "Asia/Jerusalem"
