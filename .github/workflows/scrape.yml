@@ -9,12 +9,23 @@ jobs:
     steps:
       - name: Run scraper
         run: |
+          mkdir -p /tmp/moneyman-screenshots
+          chmod 777 /tmp/moneyman-screenshots
           FULL_CONFIG=$(echo "$MONEYMAN_CONFIG" | jq --arg key "$GOOGLE_PRIVATE_KEY" '.storage.googleSheets.serviceAccountPrivateKey = $key' | jq -c .)
           docker run --rm \
             -e MONEYMAN_CONFIG="$FULL_CONFIG" \
             -e TZ="Asia/Jerusalem" \
+            -v /tmp/moneyman-screenshots:/tmp/moneyman \
             ghcr.io/daniel-hauser/moneyman:latest
         env:
           MONEYMAN_CONFIG: ${{ secrets.MONEYMAN_CONFIG }}
           GOOGLE_PRIVATE_KEY: ${{ secrets.GOOGLE_PRIVATE_KEY }}
           TZ: "Asia/Jerusalem"
+      - name: Upload failure screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-screenshots
+          path: /tmp/moneyman-screenshots
+          retention-days: 1
+          if-no-files-found: ignore
