@@ -1,53 +1,18 @@
 diff --git a/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js b/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
-index 4e821fa..cef0a00 100644
+index 4e821fa..b6f0cb3 100644
 --- a/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
 +++ b/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
-@@ -219,14 +219,20 @@ async function getAccountTransactions(page, options) {
-   return txns;
+@@ -60,6 +60,10 @@ function createLoginFields(credentials) {
+ function getAmountData(amountStr) {
+   let amountStrCopy = amountStr.replace(_constants.SHEKEL_CURRENCY_SYMBOL, '');
+   amountStrCopy = amountStrCopy.replaceAll(',', '');
++  // A negative balance can render as "- 4,726.62" (space between the minus
++  // sign and the digits) - parseFloat can't handle that gap and silently
++  // returns NaN, so strip all whitespace first.
++  amountStrCopy = amountStrCopy.replace(/\s+/g, '');
+   return parseFloat(amountStrCopy);
  }
- async function getCurrentBalance(page) {
--  // Wait for the balance element to appear and be visible
--  await (0, _elementsInteractions.waitUntilElementFound)(page, CURRENT_BALANCE, true, ELEMENT_RENDER_TIMEOUT_MS);
-+  try {
-+    // Wait for the balance element to appear and be visible
-+    await (0, _elementsInteractions.waitUntilElementFound)(page, CURRENT_BALANCE, true, ELEMENT_RENDER_TIMEOUT_MS);
- 
--  // Extract text content
--  const balanceStr = await page.$eval(CURRENT_BALANCE, el => {
--    return el.innerText;
--  });
--  return getAmountData(balanceStr);
-+    // Extract text content
-+    const balanceStr = await page.$eval(CURRENT_BALANCE, el => {
-+      return el.innerText;
-+    });
-+    console.error('[DIAG] raw balance text:', JSON.stringify(balanceStr));
-+    return getAmountData(balanceStr);
-+  } catch (error) {
-+    console.error('[DIAG] getCurrentBalance failed:', error && error.message);
-+    return null;
-+  }
- }
- async function waitForPostLogin(page) {
-   return Promise.race([(0, _elementsInteractions.waitUntilElementFound)(page, '#card-header', false),
-@@ -240,7 +246,9 @@ async function waitForPostLogin(page) {
- }
- async function fetchAccountData(page, startDate, options) {
-   const accountNumber = await getAccountNumber(page);
-+  console.error('[DIAG] fetchAccountData for account', accountNumber);
-   const balance = await getCurrentBalance(page);
-+  console.error('[DIAG] balance for', accountNumber, '=', JSON.stringify(balance), typeof balance);
-   await searchByDates(page, startDate);
-   const txns = await getAccountTransactions(page, options);
-   return {
-@@ -376,6 +384,7 @@ async function selectAccountBothUIs(page, accountId) {
- async function fetchAccountDataBothUIs(page, startDate, options) {
-   // Try to get the iframe for the new UI
-   const frame = await getTransactionsFrame(page);
-+  console.error('[DIAG] iframe found:', !!frame);
- 
-   // Use the frame if available (new UI), otherwise use the page directly (old UI)
-   const targetPage = frame || page;
+ function getTxnAmount(txn) {
 diff --git a/node_modules/israeli-bank-scrapers/lib/scrapers/max.js b/node_modules/israeli-bank-scrapers/lib/scrapers/max.js
 index ab8e48d..c76e4b3 100644
 --- a/node_modules/israeli-bank-scrapers/lib/scrapers/max.js
