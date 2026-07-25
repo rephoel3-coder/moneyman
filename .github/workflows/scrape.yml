@@ -13,6 +13,7 @@ jobs:
           docker run --rm \
             -e MONEYMAN_CONFIG="$FULL_CONFIG" \
             -e TZ="Asia/Jerusalem" \
+            -e DEBUG="moneyman:storage" \
             ghcr.io/rephoel3-coder/moneyman:latest
         env:
           MONEYMAN_CONFIG: ${{ secrets.MONEYMAN_CONFIG }}
