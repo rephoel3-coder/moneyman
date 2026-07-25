@@ -121,8 +121,13 @@ function resultsToBalances(
     if (result.success) {
       for (let account of result.accounts ?? []) {
         // Not every scraper reports a balance (credit cards generally
-        // don't) - skip those rather than saving a misleading 0.
-        if (typeof account.balance === "number") {
+        // don't), and some report NaN when the balance element on the
+        // page couldn't be parsed - skip those rather than saving a
+        // misleading value.
+        if (
+          typeof account.balance === "number" &&
+          !Number.isNaN(account.balance)
+        ) {
           balances.push({
             companyId,
             account: account.accountNumber,
