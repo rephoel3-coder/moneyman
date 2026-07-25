@@ -39,8 +39,15 @@ export interface AccountStatus {
   txnCount?: number;
 }
 
+export interface AccountBalance {
+  companyId: CompanyTypes;
+  account: string;
+  balance: number;
+}
+
 export interface SaveContext {
   accountResults?: AccountStatus[];
+  accountBalances?: AccountBalance[];
 }
 
 export interface TransactionStorage {
@@ -50,6 +57,13 @@ export interface TransactionStorage {
     onProgress: (status: string) => Promise<void>,
     context?: SaveContext,
   ): Promise<SaveStats>;
+  /**
+   * Optional: persist the latest known balance per account. Not every
+   * scraper reports a balance (mainly bank accounts do, credit cards
+   * generally don't), and not every storage backend needs to implement
+   * this - only called on storages that define it.
+   */
+  saveBalances?(balances: Array<AccountBalance>): Promise<void>;
   sendLogs?(logs: string): Promise<void>;
 }
 

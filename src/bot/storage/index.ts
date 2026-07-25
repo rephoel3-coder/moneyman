@@ -4,6 +4,7 @@ import {
   TransactionRow,
   TransactionStorage,
   SaveContext,
+  AccountBalance,
 } from "../../types.js";
 import { createLogger } from "../../utils/logger.js";
 import { loggerContextStore } from "../../utils/asyncContext.js";
@@ -46,7 +47,9 @@ export async function saveResults(results: Array<AccountScrapeResult>) {
   }
 
   const txns = resultsToTransactions(results);
-  if (txns.length === 0) {
+  const balances = resultsToBalances(results);
+
+  if (txns.length === 0 && balances.length === 0) {
     await send("No transactions found, skipping save");
     return;
   }
@@ -62,6 +65,7 @@ export async function saveResults(results: Array<AccountScrapeResult>) {
       txnCount:
         r.result.accounts?.reduce((sum, a) => sum + a.txns.length, 0) ?? 0,
     })),
+    accountBalances: balances,
   };
 
   await parallel(
@@ -72,25 +76,33 @@ export async function saveResults(results: Array<AccountScrapeResult>) {
 
       return loggerContextStore.run({ prefix: `[${name}]` }, async () => {
         try {
-          logger(`saving ${txns.length} transactions`);
-          const message = await send(saving(name));
-          const start = performance.now();
-          const stats = await storage.saveTransactions(
-            txns,
-            async (step) => {
-              steps.at(-1)?.end();
-              steps.push(new Timer(step));
-              await editMessage(message?.message_id, saving(name, steps));
-            },
-            context,
-          );
-          const duration = performance.now() - start;
-          steps.at(-1)?.end();
-          logger(`saved`);
-          await editMessage(
-            message?.message_id,
-            statsString(stats, duration, steps),
-          );
+          if (txns.length) {
+            logger(`saving ${txns.length} transactions`);
+            const message = await send(saving(name));
+            const start = performance.now();
+            const stats = await storage.saveTransactions(
+              txns,
+              async (step) => {
+                steps.at(-1)?.end();
+                steps.push(new Timer(step));
+                await editMessage(message?.message_id, saving(name, steps));
+              },
+              context,
+            );
+            const duration = performance.now() - start;
+            steps.at(-1)?.end();
+            logger(`saved`);
+            await editMessage(
+              message?.message_id,
+              statsString(stats, duration, steps),
+            );
+          }
+
+          if (balances.length && storage.saveBalances) {
+            logger(`saving ${balances.length} account balances`);
+            await storage.saveBalances(balances);
+            logger(`balances saved`);
+          }
         } catch (e) {
           logger(`error saving transactions`, e);
           sendError(e, `saveTransactions::${name}`);
@@ -98,6 +110,30 @@ export async function saveResults(results: Array<AccountScrapeResult>) {
       });
     }),
   );
+}
+
+function resultsToBalances(
+  results: Array<AccountScrapeResult>,
+): Array<AccountBalance> {
+  const balances: Array<AccountBalance> = [];
+
+  for (let { result, companyId } of results) {
+    if (result.success) {
+      for (let account of result.accounts ?? []) {
+        // Not every scraper reports a balance (credit cards generally
+        // don't) - skip those rather than saving a misleading 0.
+        if (typeof account.balance === "number") {
+          balances.push({
+            companyId,
+            account: account.accountNumber,
+            balance: account.balance,
+          });
+        }
+      }
+    }
+  }
+
+  return balances;
 }
 
 function resultsToTransactions(

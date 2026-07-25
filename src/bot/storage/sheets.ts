@@ -5,7 +5,11 @@ import {
   GoogleSpreadsheetWorksheet,
 } from "google-spreadsheet";
 import { JWT } from "google-auth-library";
-import type { TransactionRow, TransactionStorage } from "../../types.js";
+import type {
+  TransactionRow,
+  TransactionStorage,
+  AccountBalance,
+} from "../../types.js";
 import { TransactionStatuses } from "israeli-bank-scrapers/lib/transactions.js";
 import { sendError } from "../notifier.js";
 import { sendDeprecationMessage } from "../deprecationManager.js";
@@ -14,6 +18,9 @@ import { tableRow } from "../transactionTableRow.js";
 import type { MoneymanConfig } from "../../config.js";
 
 const logger = createLogger("GoogleSheetsStorage");
+
+const BALANCES_SHEET_NAME = "Balances";
+const BALANCES_HEADERS = ["account", "companyId", "balance", "updated at"];
 
 export class GoogleSheetsStorage implements TransactionStorage {
   private worksheetName: string;
@@ -24,6 +31,50 @@ export class GoogleSheetsStorage implements TransactionStorage {
   }
   canSave() {
     return Boolean(this.config.storage.googleSheets);
+  }
+
+  /**
+   * Upserts the latest known balance per account into a "Balances" sheet
+   * (created automatically on first use). One row per account, overwritten
+   * in place each run rather than appended, so it always reflects the
+   * current balance rather than growing forever.
+   */
+  async saveBalances(balances: Array<AccountBalance>) {
+    const doc = await this.getDoc();
+
+    let sheet = doc.sheetsByTitle[BALANCES_SHEET_NAME];
+    if (!sheet) {
+      sheet = await doc.addSheet({
+        title: BALANCES_SHEET_NAME,
+        headerValues: BALANCES_HEADERS,
+      });
+    } else {
+      await sheet.loadHeaderRow();
+    }
+
+    const rows = await sheet.getRows();
+    const updatedAt = new Date().toISOString();
+
+    for (const balance of balances) {
+      const existing = rows.find(
+        (row) =>
+          row.get("account") === balance.account &&
+          row.get("companyId") === balance.companyId,
+      );
+
+      if (existing) {
+        existing.set("balance", balance.balance);
+        existing.set("updated at", updatedAt);
+        await existing.save();
+      } else {
+        await sheet.addRow({
+          account: balance.account,
+          companyId: balance.companyId,
+          balance: balance.balance,
+          "updated at": updatedAt,
+        });
+      }
+    }
   }
 
   async saveTransactions(
