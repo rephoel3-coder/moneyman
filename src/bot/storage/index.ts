@@ -133,6 +133,10 @@ function resultsToBalances(
             account: account.accountNumber,
             balance: account.balance,
           });
+        } else if (account.balance !== undefined) {
+          baseLogger(
+            `Skipping non-numeric balance for ${companyId} ${account.accountNumber}: ${JSON.stringify(account.balance)}`,
+          );
         }
       }
     }
