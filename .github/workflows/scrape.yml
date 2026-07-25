@@ -14,6 +14,7 @@ jobs:
             -e MONEYMAN_CONFIG="$FULL_CONFIG" \
             -e TZ="Asia/Jerusalem" \
             -e DEBUG="moneyman:storage" \
+            -e MONEYMAN_UNSAFE_STDOUT="true" \
             ghcr.io/rephoel3-coder/moneyman:latest
         env:
           MONEYMAN_CONFIG: ${{ secrets.MONEYMAN_CONFIG }}
