@@ -11,6 +11,7 @@ import type {
   AccountBalance,
 } from "../../types.js";
 import { TransactionStatuses } from "israeli-bank-scrapers/lib/transactions.js";
+import { CompanyTypes } from "israeli-bank-scrapers";
 import { sendError } from "../notifier.js";
 import { sendDeprecationMessage } from "../deprecationManager.js";
 import { createSaveStats } from "../saveStats.js";
@@ -21,6 +22,18 @@ const logger = createLogger("GoogleSheetsStorage");
 
 const BALANCES_SHEET_NAME = "Balances";
 const BALANCES_HEADERS = ["account", "companyId", "balance", "updated at"];
+
+// Bank accounts report a "current balance" that already reflects pending
+// transactions (holds/not-yet-settled items), but pending transactions were
+// otherwise excluded entirely from the sheet - so any derived/running
+// balance calculation was permanently off by the pending amount until it
+// settled. Bank standing orders/transfers rarely change amount between
+// pending and completed (unlike card charges, where tips/holds commonly
+// do), so the risk of a pending row later duplicating as a differently-
+// hashed completed row is low here - include pending for these companies.
+const PENDING_TRANSACTIONS_ALLOWED_COMPANIES: ReadonlyArray<CompanyTypes> = [
+  CompanyTypes.pagi,
+];
 
 export class GoogleSheetsStorage implements TransactionStorage {
   private worksheetName: string;
@@ -130,7 +143,10 @@ export class GoogleSheetsStorage implements TransactionStorage {
         return false;
       }
 
-      return tx.status !== TransactionStatuses.Pending;
+      return (
+        tx.status !== TransactionStatuses.Pending ||
+        PENDING_TRANSACTIONS_ALLOWED_COMPANIES.includes(tx.companyId)
+      );
     });
 
     const hasRawColumn = sheet.headerValues.includes("raw");

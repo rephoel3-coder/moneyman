@@ -13,6 +13,7 @@ export const TableHeaders = [
   "category",
   "account",
   "companyId",
+  "status",
   "hash",
   "comment",
   "scraped at",
@@ -45,6 +46,7 @@ export function tableRow(
     category: tx.category ?? "",
     account: tx.account,
     companyId: tx.companyId,
+    status: tx.status,
     hash:
       config.options.scraping.transactionHashType === "moneyman"
         ? tx.uniqueId
