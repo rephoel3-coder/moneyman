@@ -35,7 +35,10 @@ export function tableRow(
   includeRaw: boolean = false,
 ): TableRow {
   const baseRow = {
-    date: format(parseISO(tx.date), "dd/MM/yyyy", {}),
+    // ISO format (yyyy-MM-dd) rather than dd/MM/yyyy - unambiguous regardless
+    // of the spreadsheet's locale, so Sheets can't misread day/month as the
+    // US MM/dd/yyyy convention would (e.g. 01/08 as Jan 8 instead of Aug 1).
+    date: format(parseISO(tx.date), "yyyy-MM-dd", {}),
     amount: tx.chargedAmount,
     description: tx.description,
     memo: tx.memo ?? "",
