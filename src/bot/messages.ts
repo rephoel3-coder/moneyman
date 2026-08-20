@@ -14,7 +14,7 @@ function blockquote(title: string, lines: string[], expandable = true): string {
   return `<blockquote${expandableAttr}>${title}\n${content}</blockquote>`;
 }
 
-function getAccountsSummary(results: Array<AccountScrapeResult>): string {
+export function getAccountsSummary(results: Array<AccountScrapeResult>): string {
   const successfulAccounts = results
     .filter(({ result }) => result.success)
     .flatMap(({ result, companyId }) =>
