@@ -47,10 +47,30 @@ export async function createSecureBrowserContext(
   return context;
 }
 
+const cfChallengeUrlMarkers = [
+  // The __cf_chl_rt_tk query param appears on Cloudflare's own challenge
+  // redirect URL for one specific challenge flow variant.
+  "__cf_chl_rt_tk",
+  // challenges.cloudflare.com is the fixed domain Cloudflare's Turnstile
+  // widget itself is served from, regardless of which flow triggered it -
+  // a much more general signal than the query param above.
+  "challenges.cloudflare.com",
+];
+
+// Well-known, stable Cloudflare/generic-WAF interstitial page titles. Titles
+// (unlike a specific redirect query param) are consistent across most of
+// Cloudflare's challenge variants, so checking the title catches challenge
+// pages the URL-based check alone would miss.
+const challengeTitleMarkers = [
+  "just a moment",
+  "attention required",
+  "checking your browser",
+  "please wait",
+  "please enable cookies",
+];
+
 async function initCloudflareSkipping(browserContext: BrowserContext) {
   const activeContext = loggerContextStore.getStore();
-
-  const cfParam = "__cf_chl_rt_tk";
 
   logger("Setting up Cloudflare skipping");
   browserContext.on(
@@ -82,22 +102,49 @@ async function initCloudflareSkipping(browserContext: BrowserContext) {
           });
         });
 
+        // Guards against firing overlapping solveTurnstile() attempts if
+        // multiple frame navigations land while a challenge is already
+        // being handled - concurrent mouse-click attempts on the same
+        // checkbox would only interfere with each other.
+        let solving = false;
+
         page.on(
           "framenavigated",
-          runInLoggerContext((frame) => {
+          runInLoggerContext(async (frame) => {
             const url = frame.url();
             if (!url || url === "about:blank") return;
             logger("Frame navigated", {
               url,
               parentFrameUrl: frame.parentFrame()?.url(),
             });
-            if (url.includes(cfParam)) {
+
+            let looksLikeChallenge = cfChallengeUrlMarkers.some((marker) =>
+              url.includes(marker),
+            );
+            if (!looksLikeChallenge) {
+              try {
+                const title = await frame.title();
+                looksLikeChallenge = challengeTitleMarkers.some((marker) =>
+                  title.toLowerCase().includes(marker),
+                );
+                if (looksLikeChallenge) {
+                  logger("Challenge-like page title detected", { title });
+                }
+              } catch {
+                // Frame may already be mid-navigation again; nothing to check.
+              }
+            }
+
+            if (looksLikeChallenge && !solving) {
+              solving = true;
               logger("Cloudflare challenge detected");
               solveTurnstile(page).then(
                 (res) => {
+                  solving = false;
                   logger(`Cloudflare challenge ended with ${res} for ${url}`);
                 },
                 (error) => {
+                  solving = false;
                   logger(`Cloudflare challenge failed for ${url}`, error);
                 },
               );
