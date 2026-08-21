@@ -1,23 +1,20 @@
 diff --git a/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js b/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
-index 4e821fa..b6f0cb3 100644
+index 4e821fa..40517f0 100644
 --- a/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
 +++ b/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
-@@ -60,6 +60,10 @@ function createLoginFields(credentials) {
+@@ -60,6 +60,7 @@ function createLoginFields(credentials) {
  function getAmountData(amountStr) {
    let amountStrCopy = amountStr.replace(_constants.SHEKEL_CURRENCY_SYMBOL, '');
    amountStrCopy = amountStrCopy.replaceAll(',', '');
-+  // A negative balance can render as "- 4,726.62" (space between the minus
-+  // sign and the digits) - parseFloat can't handle that gap and silently
-+  // returns NaN, so strip all whitespace first.
 +  amountStrCopy = amountStrCopy.replace(/\s+/g, '');
    return parseFloat(amountStrCopy);
  }
  function getTxnAmount(txn) {
 diff --git a/node_modules/israeli-bank-scrapers/lib/scrapers/max.js b/node_modules/israeli-bank-scrapers/lib/scrapers/max.js
-index ab8e48d..c76e4b3 100644
+index 901eba8..e49a683 100644
 --- a/node_modules/israeli-bank-scrapers/lib/scrapers/max.js
 +++ b/node_modules/israeli-bank-scrapers/lib/scrapers/max.js
-@@ -109,6 +109,9 @@ function getTransactionType(planName, planTypeId) {
+@@ -131,6 +131,9 @@ function getTransactionType(planName, planTypeId) {
      case MaxPlanName.Credit:
      case MaxPlanName.CreditOutsideTheLimit:
        return _transactions2.TransactionTypes.Installments;
