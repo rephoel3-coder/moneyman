@@ -2,14 +2,14 @@ name: Scrape
 on:
   workflow_dispatch:
   schedule:
-     # Fires every 15 min from 01:00-04:45 UTC. That window covers true
-     # 4:30am Israel local time on both sides of the DST switch - Daylight
-     # Time (UTC+3, roughly late Mar-late Oct: 4:30am local = 01:30 UTC)
-     # and Standard Time (UTC+2, roughly late Oct-late Mar: 4:30am local =
-     # 02:30 UTC) - plus buffer for GitHub Actions' own scheduling delay
-     # (observed up to ~110 min late). It does NOT scrape on every tick;
-     # see the "Check if it's time" step below for why.
-     - cron: "*/15 1-4 * * *"
+    # Fires every 15 min from 01:00-04:45 UTC. That window covers true
+    # 4:30am Israel local time on both sides of the DST switch - Daylight
+    # Time (UTC+3, roughly late Mar-late Oct: 4:30am local = 01:30 UTC)
+    # and Standard Time (UTC+2, roughly late Oct-late Mar: 4:30am local =
+    # 02:30 UTC) - plus buffer for GitHub Actions' own scheduling delay
+    # (observed up to ~110 min late). It does NOT scrape on every tick;
+    # see the "Check if it's time" step below for why.
+    - cron: "*/15 1-4 * * *"
 jobs:
   scrape:
     runs-on: ubuntu-latest
@@ -59,15 +59,30 @@ jobs:
         if: steps.timing.outputs.ok == 'true' && steps.dedup.outputs.cache-hit != 'true'
         run: |
           FULL_CONFIG=$(echo "$MONEYMAN_CONFIG" | jq --arg key "$GOOGLE_PRIVATE_KEY" '.storage.googleSheets.serviceAccountPrivateKey = $key' | jq -c .)
+          mkdir -p .failure-screenshots
           docker run --rm \
             -e MONEYMAN_CONFIG="$FULL_CONFIG" \
             -e TZ="Asia/Jerusalem" \
+            -v "$PWD/.failure-screenshots:/tmp/moneyman" \
             ghcr.io/rephoel3-coder/moneyman:latest
           mkdir -p .scrape-marker && date > .scrape-marker/done
         env:
           MONEYMAN_CONFIG: ${{ secrets.MONEYMAN_CONFIG }}
           GOOGLE_PRIVATE_KEY: ${{ secrets.GOOGLE_PRIVATE_KEY }}
           TZ: "Asia/Jerusalem"
+
+      # Screenshots taken on scrape failure end up here (see failureScreenshot.ts).
+      # Uploading them lets us see exactly what the automated browser hit,
+      # even though the run itself is otherwise not exposed anywhere without
+      # Telegram configured.
+      - name: Upload failure screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-screenshots
+          path: .failure-screenshots
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Save today's marker so later ticks skip
         if: steps.timing.outputs.ok == 'true' && steps.dedup.outputs.cache-hit != 'true' && github.event_name != 'workflow_dispatch'
