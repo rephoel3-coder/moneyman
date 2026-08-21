@@ -20,21 +20,5 @@ else
   # Duplicate stdout to the public log FD so public logs bypass redirection
   eval "exec ${PUBLIC_LOG_FD}>&1"
 
-  # TEMPORARY diagnostic (see commit message): report whether
-  # getFailureScreenShotPath()'s screenshots actually got written to
-  # /tmp/moneyman, since a mounted volume showed zero files despite a
-  # failed scrape. Only file names/sizes are logged, never image content.
-  set +e
-  "$@" > "$MONEYMAN_LOG_FILE_PATH" 2>&1
-  status=$?
-  set -e
-
-  if [ -d /tmp/moneyman ]; then
-    echo "[diagnostic] /tmp/moneyman contents:" >&"$PUBLIC_LOG_FD"
-    find /tmp/moneyman -exec ls -la {} \; >&"$PUBLIC_LOG_FD" 2>&1
-  else
-    echo "[diagnostic] /tmp/moneyman does not exist" >&"$PUBLIC_LOG_FD"
-  fi
-
-  exit "$status"
+  exec "$@" > "$MONEYMAN_LOG_FILE_PATH" 2>&1
 fi
