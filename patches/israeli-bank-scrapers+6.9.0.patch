@@ -1,5 +1,5 @@
 diff --git a/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js b/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
-index 4e821fa..2b72e4b 100644
+index 4e821fa..d3aa639 100644
 --- a/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
 +++ b/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
 @@ -60,6 +60,7 @@ function createLoginFields(credentials) {
@@ -14,7 +14,7 @@ index 4e821fa..2b72e4b 100644
    });
    return getAmountData(balanceStr);
  }
-+async function waitForSelectorResilientToNavigation(page, selector, onlyVisible, overallTimeoutMs = 30000) {
++async function waitForSelectorResilientToNavigation(page, selector, onlyVisible, overallTimeoutMs = 60000) {
 +  const deadline = Date.now() + overallTimeoutMs;
 +  for (;;) {
 +    const remaining = deadline - Date.now();
@@ -53,14 +53,14 @@ index 4e821fa..2b72e4b 100644
  }
  async function fetchAccountData(page, startDate, options) {
 diff --git a/node_modules/israeli-bank-scrapers/lib/scrapers/base-scraper-with-browser.js b/node_modules/israeli-bank-scrapers/lib/scrapers/base-scraper-with-browser.js
-index 4c13609..a3386ad 100644
+index 4c13609..1bfcf26 100644
 --- a/node_modules/israeli-bank-scrapers/lib/scrapers/base-scraper-with-browser.js
 +++ b/node_modules/israeli-bank-scrapers/lib/scrapers/base-scraper-with-browser.js
 @@ -53,6 +53,25 @@ async function getKeyByValue(object, value, page) {
    }
    return Promise.resolve(LoginResults.UnknownError);
  }
-+async function getCurrentUrlResilientToNavigation(page, clientSide, overallTimeoutMs = 10000) {
++async function getCurrentUrlResilientToNavigation(page, clientSide, overallTimeoutMs = 20000) {
 +  const deadline = Date.now() + overallTimeoutMs;
 +  for (;;) {
 +    try {
@@ -91,6 +91,39 @@ index 4c13609..a3386ad 100644
      const loginResult = await getKeyByValue(loginOptions.possibleResults, current, this.page);
      debug(`handle login results ${loginResult}`);
      return this.handleLoginResult(loginResult);
+@@ -250,10 +269,28 @@ class BaseScraperWithBrowser extends _baseScraper.BaseScraper {
+     this.emitProgress(_definitions.ScraperProgressTypes.Terminating);
+     if (!_success && !!this.options.storeFailureScreenShotPath) {
+       debug(`create a snapshot before terminated in ${this.options.storeFailureScreenShotPath}`);
+-      await this.page.screenshot({
+-        path: this.options.storeFailureScreenShotPath,
+-        fullPage: true
+-      });
++      // A page that failed mid-navigation is often still unstable right
++      // here, so a bare screenshot() can throw the same transient
++      // "Execution context was destroyed" error the original failure did -
++      // silently losing the screenshot AND overwriting the real error with
++      // this one. Retry through that instead of letting it mask anything.
++      const screenshotDeadline = Date.now() + 15000;
++      for (;;) {
++        try {
++          await this.page.screenshot({
++            path: this.options.storeFailureScreenShotPath,
++            fullPage: true
++          });
++          break;
++        } catch (e) {
++          const msg = e && e.message || '';
++          if ((msg.includes('Execution context was destroyed') || msg.includes('Node is detached from document')) && Date.now() < screenshotDeadline) {
++            continue;
++          }
++          debug(`failed to capture failure screenshot: ${msg}`);
++          break;
++        }
++      }
+     }
+     await Promise.all(this.cleanups.reverse().map(safeCleanup));
+     this.cleanups = [];
 diff --git a/node_modules/israeli-bank-scrapers/lib/scrapers/max.js b/node_modules/israeli-bank-scrapers/lib/scrapers/max.js
 index 901eba8..e49a683 100644
 --- a/node_modules/israeli-bank-scrapers/lib/scrapers/max.js
