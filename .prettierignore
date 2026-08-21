@@ -1,0 +1,5 @@
+# autofix.ci is not allowed to commit changes under .github/ (GitHub Actions
+# workflow permissions), so any Prettier drift there makes it fail outright
+# instead of auto-fixing. Excluding the directory here means Prettier never
+# flags it as needing a change in the first place.
+.github/
