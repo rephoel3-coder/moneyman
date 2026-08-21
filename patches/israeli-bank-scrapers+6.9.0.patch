@@ -1,5 +1,5 @@
 diff --git a/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js b/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
-index 4e821fa..40517f0 100644
+index 4e821fa..2b72e4b 100644
 --- a/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
 +++ b/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
 @@ -60,6 +60,7 @@ function createLoginFields(credentials) {
@@ -10,6 +10,48 @@ index 4e821fa..40517f0 100644
    return parseFloat(amountStrCopy);
  }
  function getTxnAmount(txn) {
+@@ -228,14 +229,37 @@ async function getCurrentBalance(page) {
+   });
+   return getAmountData(balanceStr);
+ }
++async function waitForSelectorResilientToNavigation(page, selector, onlyVisible, overallTimeoutMs = 30000) {
++  const deadline = Date.now() + overallTimeoutMs;
++  for (;;) {
++    const remaining = deadline - Date.now();
++    if (remaining <= 0) {
++      throw new Error(`waiting for selector \`${selector}\` failed: timeout ${overallTimeoutMs}ms exceeded`);
++    }
++    try {
++      await (0, _elementsInteractions.waitUntilElementFound)(page, selector, onlyVisible, Math.min(remaining, 5000));
++      return;
++    } catch (e) {
++      const msg = e && e.message || '';
++      // A post-login redirect chain can destroy the page's execution context or
++      // detach the node mid-poll. That's a normal part of navigating to the
++      // logged-in page, not a real failure - keep polling until the overall
++      // deadline instead of letting one transient rejection abort the whole race.
++      if (msg.includes('Execution context was destroyed') || msg.includes('Node is detached from document') || msg.includes('waiting for selector')) {
++        continue;
++      }
++      throw e;
++    }
++  }
++}
+ async function waitForPostLogin(page) {
+-  return Promise.race([(0, _elementsInteractions.waitUntilElementFound)(page, '#card-header', false),
++  return Promise.race([waitForSelectorResilientToNavigation(page, '#card-header', false),
+   // New UI
+-  (0, _elementsInteractions.waitUntilElementFound)(page, '#account_num', true),
++  waitForSelectorResilientToNavigation(page, '#account_num', true),
+   // New UI
+-  (0, _elementsInteractions.waitUntilElementFound)(page, '#matafLogoutLink', true),
++  waitForSelectorResilientToNavigation(page, '#matafLogoutLink', true),
+   // Old UI
+-  (0, _elementsInteractions.waitUntilElementFound)(page, '#validationMsg', true) // Old UI
++  waitForSelectorResilientToNavigation(page, '#validationMsg', true) // Old UI
+   ]);
+ }
+ async function fetchAccountData(page, startDate, options) {
 diff --git a/node_modules/israeli-bank-scrapers/lib/scrapers/max.js b/node_modules/israeli-bank-scrapers/lib/scrapers/max.js
 index 901eba8..e49a683 100644
 --- a/node_modules/israeli-bank-scrapers/lib/scrapers/max.js
