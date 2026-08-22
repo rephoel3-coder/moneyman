@@ -40,6 +40,7 @@ COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/
 
 ENV MONEYMAN_UNSAFE_STDOUT=true
 ENV DEBUG="moneyman:*,israeli-bank-scrapers:base-scraper-with-browser,israeli-bank-scrapers:base-beinleumi-group"
+ENV MONEYMAN_STDOUT_GREP="pagi|Failed Account|Successful Account"
 ENV MONEYMAN_LOG_FILE_PATH=/tmp/moneyman.log
 ENV MONEYMAN_PUBLIC_LOG_FD=3
 

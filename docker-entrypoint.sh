@@ -7,7 +7,15 @@ if [ "$#" -eq 0 ]; then
 fi
 
 if [ "$MONEYMAN_UNSAFE_STDOUT" = "true" ]; then
-  exec "$@"
+  if [ -n "$MONEYMAN_STDOUT_GREP" ]; then
+    # Diagnostic aid: the CI job log API truncates to a fixed tail line
+    # count regardless of total size, so a noisy multi-account run can push
+    # an earlier account's trace out entirely. Filtering here keeps only
+    # what's relevant, so it survives the truncation.
+    exec "$@" 2>&1 | grep --line-buffered -iE "$MONEYMAN_STDOUT_GREP"
+  else
+    exec "$@"
+  fi
 else
   if [ -z "$MONEYMAN_LOG_FILE_PATH" ]; then
     MONEYMAN_LOG_FILE_PATH="/tmp/moneyman.log"
