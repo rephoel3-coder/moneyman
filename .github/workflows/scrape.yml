@@ -63,6 +63,8 @@ jobs:
           docker run --rm \
             -e MONEYMAN_CONFIG="$FULL_CONFIG" \
             -e TZ="Asia/Jerusalem" \
+            -e MONEYMAN_UNSAFE_STDOUT=true \
+            -e DEBUG="moneyman:*,israeli-bank-scrapers:*" \
             -v "$PWD/.failure-screenshots:/tmp/moneyman" \
             ghcr.io/rephoel3-coder/moneyman:latest
           mkdir -p .scrape-marker && date > .scrape-marker/done
