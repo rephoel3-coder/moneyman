@@ -1,3 +1,25 @@
+diff --git a/node_modules/israeli-bank-scrapers/lib/helpers/elements-interactions.js b/node_modules/israeli-bank-scrapers/lib/helpers/elements-interactions.js
+index efd9183..0111eae 100644
+--- a/node_modules/israeli-bank-scrapers/lib/helpers/elements-interactions.js
++++ b/node_modules/israeli-bank-scrapers/lib/helpers/elements-interactions.js
+@@ -45,7 +45,16 @@ async function fillInput(pageOrFrame, inputSelector, inputValue) {
+     // @ts-ignore
+     inputElement.value = '';
+   });
+-  await pageOrFrame.type(inputSelector, inputValue);
++  // Typing the whole value in one call (or with no/zero delay) sends every
++  // keystroke back-to-back with no human-scale timing variance, which some
++  // sites' bot-detection (e.g. Radware Bot Manager) uses to flag and
++  // redirect the session mid-form-fill, before the login is even submitted.
++  // A per-character randomized delay is enough to break that specific
++  // signal without changing what actually gets typed.
++  await pageOrFrame.click(inputSelector).catch(() => {});
++  for (const char of inputValue) {
++    await pageOrFrame.type(inputSelector, char, { delay: 60 + Math.floor(Math.random() * 90) });
++  }
+ }
+ async function setValue(pageOrFrame, inputSelector, inputValue) {
+   await pageOrFrame.$eval(inputSelector, (input, value) => {
 diff --git a/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js b/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
 index 4e821fa..38dec2f 100644
 --- a/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
