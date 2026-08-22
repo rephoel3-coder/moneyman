@@ -1,5 +1,5 @@
 diff --git a/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js b/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
-index 4e821fa..d3aa639 100644
+index 4e821fa..38dec2f 100644
 --- a/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
 +++ b/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
 @@ -60,6 +60,7 @@ function createLoginFields(credentials) {
@@ -10,6 +10,42 @@ index 4e821fa..d3aa639 100644
    return parseFloat(amountStrCopy);
  }
  function getTxnAmount(txn) {
+@@ -168,7 +169,7 @@ async function isNoTransactionInDateRangeError(page) {
+ }
+ async function searchByDates(page, startDate) {
+   await (0, _elementsInteractions.clickButton)(page, 'a#tabHeader4');
+-  await (0, _elementsInteractions.waitUntilElementFound)(page, 'div#fibi_dates');
++  await waitForSelectorResilientToNavigation(page, 'div#fibi_dates', false);
+   await (0, _elementsInteractions.fillInput)(page, 'input#fromDate', startDate.format(DATE_FORMAT));
+   await (0, _elementsInteractions.clickButton)(page, `button[class*=${CLOSE_SEARCH_BY_DATES_BUTTON_CLASS}]`);
+   await (0, _elementsInteractions.clickButton)(page, `input[value=${SHOW_SEARCH_BY_DATES_BUTTON_VALUE}]`);
+@@ -176,7 +177,7 @@ async function searchByDates(page, startDate) {
+ }
+ async function getAccountNumber(page) {
+   // Wait until the account number element is present in the DOM
+-  await (0, _elementsInteractions.waitUntilElementFound)(page, ACCOUNTS_NUMBER, true, ELEMENT_RENDER_TIMEOUT_MS);
++  await waitForSelectorResilientToNavigation(page, ACCOUNTS_NUMBER, true, ELEMENT_RENDER_TIMEOUT_MS);
+   const selectedSnifAccount = await page.$eval(ACCOUNTS_NUMBER, option => {
+     return option.innerText;
+   });
+@@ -208,7 +209,7 @@ async function scrapeTransactions(page, tableLocator, transactionStatus, needToP
+   return convertTransactions(txns, options);
+ }
+ async function getAccountTransactions(page, options) {
+-  await Promise.race([(0, _elementsInteractions.waitUntilElementFound)(page, "div[id*='divTable']", false), (0, _elementsInteractions.waitUntilElementFound)(page, `.${ERROR_MESSAGE_CLASS}`, false)]);
++  await Promise.race([waitForSelectorResilientToNavigation(page, "div[id*='divTable']", false), waitForSelectorResilientToNavigation(page, `.${ERROR_MESSAGE_CLASS}`, false)]);
+   const noTransactionInRangeError = await isNoTransactionInDateRangeError(page);
+   if (noTransactionInRangeError) {
+     return [];
+@@ -220,7 +221,7 @@ async function getAccountTransactions(page, options) {
+ }
+ async function getCurrentBalance(page) {
+   // Wait for the balance element to appear and be visible
+-  await (0, _elementsInteractions.waitUntilElementFound)(page, CURRENT_BALANCE, true, ELEMENT_RENDER_TIMEOUT_MS);
++  await waitForSelectorResilientToNavigation(page, CURRENT_BALANCE, true, ELEMENT_RENDER_TIMEOUT_MS);
+ 
+   // Extract text content
+   const balanceStr = await page.$eval(CURRENT_BALANCE, el => {
 @@ -228,14 +229,37 @@ async function getCurrentBalance(page) {
    });
    return getAmountData(balanceStr);
@@ -52,6 +88,39 @@ index 4e821fa..d3aa639 100644
    ]);
  }
  async function fetchAccountData(page, startDate, options) {
+@@ -250,12 +274,26 @@ async function fetchAccountData(page, startDate, options) {
+   };
+ }
+ async function getAccountIdsOldUI(page) {
+-  return page.evaluate(() => {
+-    const selectElement = document.getElementById('account_num_select');
+-    const options = selectElement ? selectElement.querySelectorAll('option') : [];
+-    if (!options) return [];
+-    return Array.from(options, option => option.value);
+-  });
++  const deadline = Date.now() + 20000;
++  for (;;) {
++    try {
++      return await page.evaluate(() => {
++        const selectElement = document.getElementById('account_num_select');
++        const options = selectElement ? selectElement.querySelectorAll('option') : [];
++        if (!options) return [];
++        return Array.from(options, option => option.value);
++      });
++    } catch (e) {
++      const msg = e && e.message || '';
++      // Reached right after navigating to TRANSACTIONS_URL, where a lingering
++      // redirect can still tear down the execution context mid-evaluate -
++      // that's not a real failure, so retry until the page settles.
++      if ((msg.includes('Execution context was destroyed') || msg.includes('Node is detached from document')) && Date.now() < deadline) {
++        continue;
++      }
++      throw e;
++    }
++  }
+ }
+ 
+ /**
 diff --git a/node_modules/israeli-bank-scrapers/lib/scrapers/base-scraper-with-browser.js b/node_modules/israeli-bank-scrapers/lib/scrapers/base-scraper-with-browser.js
 index 4c13609..1bfcf26 100644
 --- a/node_modules/israeli-bank-scrapers/lib/scrapers/base-scraper-with-browser.js
