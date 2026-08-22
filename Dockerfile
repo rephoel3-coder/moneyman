@@ -38,7 +38,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dst ./dst
 COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/
 
-ENV MONEYMAN_UNSAFE_STDOUT=false
+ENV MONEYMAN_UNSAFE_STDOUT=true
+ENV DEBUG="moneyman:*,israeli-bank-scrapers:*"
 ENV MONEYMAN_LOG_FILE_PATH=/tmp/moneyman.log
 ENV MONEYMAN_PUBLIC_LOG_FD=3
 
