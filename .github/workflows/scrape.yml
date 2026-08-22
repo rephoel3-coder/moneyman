@@ -12,7 +12,11 @@ on:
     - cron: "*/15 1-4 * * *"
 jobs:
   scrape:
-    runs-on: ubuntu-latest
+    # Runs on the account owner's own Windows machine (self-hosted runner)
+    # instead of GitHub's cloud servers, because Pagi's site blocks/challenges
+    # traffic from cloud datacenter IPs specifically - confirmed by running
+    # the exact same scraper from a home connection, where it worked cleanly.
+    runs-on: [self-hosted, Windows]
     steps:
       # Every 15-min tick reaches this step, but only the first one at/after
       # true 4:30am Israel local time (computed live, so this is correct
@@ -21,26 +25,30 @@ jobs:
       # goes through immediately, ignoring the clock.
       - name: Check if it's time
         id: timing
+        shell: powershell
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Manual trigger - running regardless of the clock."
-            echo "ok=true" >> "$GITHUB_OUTPUT"
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            Write-Host "Manual trigger - running regardless of the clock."
+            "ok=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
             exit 0
-          fi
-          NOW_LOCAL=$(TZ="Asia/Jerusalem" date +%H%M)
-          echo "Current Israel local time: $NOW_LOCAL"
-          if [ "$NOW_LOCAL" -ge "0430" ]; then
-            echo "At or after 4:30am local - eligible to scrape."
-            echo "ok=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Before 4:30am local - too early, skipping this tick."
-            echo "ok=false" >> "$GITHUB_OUTPUT"
-          fi
+          }
+          $nowLocal = [System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, "Israel Standard Time").ToString("HHmm")
+          Write-Host "Current Israel local time: $nowLocal"
+          if ([int]$nowLocal -ge 430) {
+            Write-Host "At or after 4:30am local - eligible to scrape."
+            "ok=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } else {
+            Write-Host "Before 4:30am local - too early, skipping this tick."
+            "ok=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
 
       - name: Today's date (Israel)
         if: steps.timing.outputs.ok == 'true'
         id: today
-        run: echo "date=$(TZ='Asia/Jerusalem' date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+        shell: powershell
+        run: |
+          $todayIL = [System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, "Israel Standard Time").ToString("yyyy-MM-dd")
+          "date=$todayIL" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       # A scheduled tick that's on-or-after 4:30am is otherwise eligible to
       # scrape on EVERY tick until 04:45 UTC - this cache marker is what
@@ -57,19 +65,27 @@ jobs:
 
       - name: Run scraper
         if: steps.timing.outputs.ok == 'true' && steps.dedup.outputs.cache-hit != 'true'
+        shell: powershell
         run: |
-          FULL_CONFIG=$(echo "$MONEYMAN_CONFIG" | jq --arg key "$GOOGLE_PRIVATE_KEY" '.storage.googleSheets.serviceAccountPrivateKey = $key' | jq -c .)
-          mkdir -p .failure-screenshots
-          docker run --rm \
-            -e MONEYMAN_CONFIG="$FULL_CONFIG" \
-            -e TZ="Asia/Jerusalem" \
-            -v "$PWD/.failure-screenshots:/tmp/moneyman" \
+          $config = $env:MONEYMAN_CONFIG | ConvertFrom-Json
+          $config.storage.googleSheets.serviceAccountPrivateKey = $env:GOOGLE_PRIVATE_KEY
+          $env:MONEYMAN_CONFIG = $config | ConvertTo-Json -Depth 20 -Compress
+
+          New-Item -ItemType Directory -Force -Path .failure-screenshots | Out-Null
+
+          docker run --rm `
+            -e MONEYMAN_CONFIG `
+            -e TZ="Asia/Jerusalem" `
+            -v "${PWD}\.failure-screenshots:/tmp/moneyman" `
             ghcr.io/rephoel3-coder/moneyman:latest
-          mkdir -p .scrape-marker && date > .scrape-marker/done
+
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          New-Item -ItemType Directory -Force -Path .scrape-marker | Out-Null
+          Get-Date | Out-File -FilePath .scrape-marker/done
         env:
           MONEYMAN_CONFIG: ${{ secrets.MONEYMAN_CONFIG }}
           GOOGLE_PRIVATE_KEY: ${{ secrets.GOOGLE_PRIVATE_KEY }}
-          TZ: "Asia/Jerusalem"
 
       # Screenshots taken on scrape failure end up here (see failureScreenshot.ts).
       # Uploading them lets us see exactly what the automated browser hit,
