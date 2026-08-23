@@ -32,7 +32,6 @@ export async function sendFailureScreenShots(
         caption: `[${path.basename(path.dirname(photoPath))}] Failure screenshot`,
       })),
     );
-    fs.rmSync(tempFolder, { recursive: true, force: true });
   } catch (e) {
     logger("Failed to send failure screenshots", e);
   }
