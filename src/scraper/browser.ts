@@ -6,7 +6,7 @@ import puppeteer, {
   type BrowserContext,
   type LaunchOptions,
 } from "puppeteer";
-import { createLogger } from "../utils/logger.js";
+import { createLogger, logToPublicLog } from "../utils/logger.js";
 import {
   runInLoggerContext,
   loggerContextStore,
@@ -24,8 +24,17 @@ import { config } from "../config.js";
 // like an HTTPS-scanning antivirus. Presence of a cert at /certs is an
 // explicit signal the user already trusts whatever's doing that
 // interception, so bypass Chromium's own cert validation too in that case.
-const hasMountedCerts =
-  existsSync("/certs") && readdirSync("/certs").length > 0;
+const mountedCertFiles = existsSync("/certs") ? readdirSync("/certs") : [];
+const hasMountedCerts = mountedCertFiles.length > 0;
+// Temporary diagnostic: --ignore-certificate-errors didn't fix
+// ERR_CERT_AUTHORITY_INVALID on a real run despite a cert being mounted at
+// /certs, which shouldn't happen if the flag actually activated - this
+// pins down whether /certs came through empty (mount issue) or something
+// else is going on. logToPublicLog so it's visible without DEBUG/unsafe
+// stdout. Doesn't log cert content, only file names/count.
+logToPublicLog(
+  `/certs contents: [${mountedCertFiles.join(", ")}] (hasMountedCerts=${hasMountedCerts})`,
+);
 
 export const browserArgs = [
   "--disable-dev-shm-usage",
