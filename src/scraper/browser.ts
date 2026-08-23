@@ -1,4 +1,5 @@
 import type { CompanyTypes } from "israeli-bank-scrapers";
+import { existsSync, readdirSync } from "fs";
 import puppeteer, {
   TargetType,
   type Browser,
@@ -14,11 +15,24 @@ import { initDomainTracking } from "../security/domains.js";
 import { solveTurnstile } from "./cloudflareSolver.js";
 import { config } from "../config.js";
 
+// docker-entrypoint.sh imports any cert(s) mounted at /certs into the
+// system trust store, which covers Node's own outbound HTTPS calls (e.g.
+// storage APIs). Chromium doesn't necessarily consult that same store -
+// many builds validate certificates against their own bundled root store
+// regardless of the OS trust settings - so a mounted cert alone isn't
+// guaranteed to make Chromium accept re-signed traffic from something
+// like an HTTPS-scanning antivirus. Presence of a cert at /certs is an
+// explicit signal the user already trusts whatever's doing that
+// interception, so bypass Chromium's own cert validation too in that case.
+const hasMountedCerts =
+  existsSync("/certs") && readdirSync("/certs").length > 0;
+
 export const browserArgs = [
   "--disable-dev-shm-usage",
   "--no-sandbox",
   // Reduce easy automation fingerprints used by anti-bot providers.
   "--disable-blink-features=AutomationControlled",
+  ...(hasMountedCerts ? ["--ignore-certificate-errors"] : []),
 ];
 export const browserExecutablePath =
   config.options.scraping.puppeteerExecutablePath || undefined;
