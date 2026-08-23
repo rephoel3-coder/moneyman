@@ -12,7 +12,7 @@ on:
     - cron: "*/15 1-4 * * *"
 jobs:
   scrape:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows]
     steps:
       # Every 15-min tick reaches this step, but only the first one at/after
       # true 4:30am Israel local time (computed live, so this is correct
