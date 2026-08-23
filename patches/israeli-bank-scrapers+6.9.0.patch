@@ -144,7 +144,7 @@ index 4e821fa..38dec2f 100644
  
  /**
 diff --git a/node_modules/israeli-bank-scrapers/lib/scrapers/base-scraper-with-browser.js b/node_modules/israeli-bank-scrapers/lib/scrapers/base-scraper-with-browser.js
-index 4c13609..88dd32a 100644
+index 4c13609..633a91c 100644
 --- a/node_modules/israeli-bank-scrapers/lib/scrapers/base-scraper-with-browser.js
 +++ b/node_modules/israeli-bank-scrapers/lib/scrapers/base-scraper-with-browser.js
 @@ -13,6 +13,20 @@ var _baseScraper = require("./base-scraper");
@@ -203,7 +203,7 @@ index 4c13609..88dd32a 100644
      const loginResult = await getKeyByValue(loginOptions.possibleResults, current, this.page);
      debug(`handle login results ${loginResult}`);
      return this.handleLoginResult(loginResult);
-@@ -250,10 +283,30 @@ class BaseScraperWithBrowser extends _baseScraper.BaseScraper {
+@@ -250,10 +283,44 @@ class BaseScraperWithBrowser extends _baseScraper.BaseScraper {
      this.emitProgress(_definitions.ScraperProgressTypes.Terminating);
      if (!_success && !!this.options.storeFailureScreenShotPath) {
        debug(`create a snapshot before terminated in ${this.options.storeFailureScreenShotPath}`);
@@ -211,6 +211,20 @@ index 4c13609..88dd32a 100644
 -        path: this.options.storeFailureScreenShotPath,
 -        fullPage: true
 -      });
++      // Temporary diagnostic: the screenshot file writes successfully inside
++      // the container but never shows up on the host as a CI artifact (a
++      // separate Docker-on-Windows bind-mount issue) - logging the page's
++      // title/URL/a text snippet directly sidesteps that entirely, since it
++      // travels through the same log pipe the rest of this output already
++      // uses successfully.
++      try {
++        const pageUrl = this.page.url();
++        const pageTitle = await this.page.title();
++        const bodyText = await this.page.evaluate(() => document.body ? document.body.innerText.slice(0, 500) : '(no body)');
++        _publicLog(`page state at failure - url: ${pageUrl} | title: ${pageTitle} | body snippet: ${JSON.stringify(bodyText)}`);
++      } catch (e) {
++        _publicLog(`failed to capture page state at failure: ${e && e.message}`);
++      }
 +      // A page that failed mid-navigation is often still unstable right
 +      // here, so a bare screenshot() can throw the same transient
 +      // "Execution context was destroyed" error the original failure did -
