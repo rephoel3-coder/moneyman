@@ -77,7 +77,8 @@ jobs:
             -e TZ="Asia/Jerusalem" `
             -v "${PWD}\.failure-screenshots:/tmp/moneyman" `
             -v "C:\actions-runner\certs:/certs" `
-            ghcr.io/rephoel3-coder/moneyman:latest
+            --pull always `
+          ghcr.io/rephoel3-coder/moneyman:latest
 
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
