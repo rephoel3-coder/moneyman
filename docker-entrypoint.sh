@@ -6,6 +6,21 @@ if [ "$#" -eq 0 ]; then
   set -- node dst/index.js
 fi
 
+# Some environments (e.g. antivirus/security software with HTTPS scanning,
+# like ESET's SSL/TLS filtering) transparently intercept and re-sign all
+# outbound TLS traffic with their own root CA. The host OS trusts that CA,
+# but this container is an isolated environment that never sees it, so
+# every HTTPS request - including the scraped bank sites - fails with
+# ERR_CERT_AUTHORITY_INVALID. Mounting CA cert file(s) into /certs lets the
+# container trust them too, matching what the host already trusts.
+if [ -d /certs ]; then
+  for cert in /certs/*; do
+    [ -f "$cert" ] || continue
+    cp "$cert" "/usr/local/share/ca-certificates/$(basename "$cert" | sed 's/\.[^.]*$//').crt"
+  done
+  update-ca-certificates
+fi
+
 if [ "$MONEYMAN_UNSAFE_STDOUT" = "true" ]; then
   if [ -n "$MONEYMAN_STDOUT_GREP" ]; then
     # Diagnostic aid: the CI job log API truncates to a fixed tail line
