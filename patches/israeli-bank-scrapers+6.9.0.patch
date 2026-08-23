@@ -21,7 +21,7 @@ index efd9183..0111eae 100644
  async function setValue(pageOrFrame, inputSelector, inputValue) {
    await pageOrFrame.$eval(inputSelector, (input, value) => {
 diff --git a/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js b/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
-index 4e821fa..38dec2f 100644
+index 4e821fa..7c258b5 100644
 --- a/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
 +++ b/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
 @@ -60,6 +60,7 @@ function createLoginFields(credentials) {
@@ -68,7 +68,7 @@ index 4e821fa..38dec2f 100644
  
    // Extract text content
    const balanceStr = await page.$eval(CURRENT_BALANCE, el => {
-@@ -228,14 +229,37 @@ async function getCurrentBalance(page) {
+@@ -228,15 +229,63 @@ async function getCurrentBalance(page) {
    });
    return getAmountData(balanceStr);
  }
@@ -95,6 +95,24 @@ index 4e821fa..38dec2f 100644
 +    }
 +  }
 +}
++async function waitForUrlMatchingSuccess(page, overallTimeoutMs = 60000) {
++  const successPatterns = getPossibleLoginResults()[_baseScraperWithBrowser.LoginResults.Success];
++  const deadline = Date.now() + overallTimeoutMs;
++  for (;;) {
++    if (Date.now() >= deadline) {
++      throw new Error(`waiting for a known post-login URL failed: timeout ${overallTimeoutMs}ms exceeded`);
++    }
++    try {
++      const url = page.url();
++      if (successPatterns.some(pattern => pattern.test(url))) {
++        return;
++      }
++    } catch (e) {
++      // Page mid-navigation; ignore and retry below.
++    }
++    await new Promise(resolve => setTimeout(resolve, 250));
++  }
++}
  async function waitForPostLogin(page) {
 -  return Promise.race([(0, _elementsInteractions.waitUntilElementFound)(page, '#card-header', false),
 +  return Promise.race([waitForSelectorResilientToNavigation(page, '#card-header', false),
@@ -106,11 +124,20 @@ index 4e821fa..38dec2f 100644
 +  waitForSelectorResilientToNavigation(page, '#matafLogoutLink', true),
    // Old UI
 -  (0, _elementsInteractions.waitUntilElementFound)(page, '#validationMsg', true) // Old UI
-+  waitForSelectorResilientToNavigation(page, '#validationMsg', true) // Old UI
-   ]);
+-  ]);
++  waitForSelectorResilientToNavigation(page, '#validationMsg', true),
++  // Old UI
++  // Newer "appsng" Angular shell doesn't have any of the four DOM markers
++  // above at all - a real production run landed on a genuinely successful,
++  // fully-loaded post-login page (matching the URL patterns already used
++  // to detect login success elsewhere) and just sat there polling for
++  // elements that don't exist in this UI variant until the full timeout.
++  // Recognizing arrival at a known-success URL directly avoids that.
++  waitForUrlMatchingSuccess(page)]);
  }
  async function fetchAccountData(page, startDate, options) {
-@@ -250,12 +274,26 @@ async function fetchAccountData(page, startDate, options) {
+   const accountNumber = await getAccountNumber(page);
+@@ -250,12 +299,26 @@ async function fetchAccountData(page, startDate, options) {
    };
  }
  async function getAccountIdsOldUI(page) {
