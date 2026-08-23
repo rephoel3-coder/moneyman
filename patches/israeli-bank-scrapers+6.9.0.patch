@@ -144,10 +144,31 @@ index 4e821fa..38dec2f 100644
  
  /**
 diff --git a/node_modules/israeli-bank-scrapers/lib/scrapers/base-scraper-with-browser.js b/node_modules/israeli-bank-scrapers/lib/scrapers/base-scraper-with-browser.js
-index 4c13609..1bfcf26 100644
+index 4c13609..88dd32a 100644
 --- a/node_modules/israeli-bank-scrapers/lib/scrapers/base-scraper-with-browser.js
 +++ b/node_modules/israeli-bank-scrapers/lib/scrapers/base-scraper-with-browser.js
-@@ -53,6 +53,25 @@ async function getKeyByValue(object, value, page) {
+@@ -13,6 +13,20 @@ var _baseScraper = require("./base-scraper");
+ var _errors = require("./errors");
+ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+ const debug = (0, _debug.getDebug)('base-scraper-with-browser');
++// Temporary diagnostic: the failure screenshot for pagi never shows up as a
++// CI artifact even after fixing an unrelated cleanup bug that deleted it -
++// this writes success/failure of the screenshot attempt itself straight to
++// the visible public log (bypassing DEBUG/redirection) to see which it is.
++function _publicLog(msg) {
++  try {
++    if (process.env.MONEYMAN_UNSAFE_STDOUT === 'true') {
++      console.log(msg);
++      return;
++    }
++    const fd = parseInt(process.env.MONEYMAN_PUBLIC_LOG_FD || '3', 10);
++    require('fs').writeSync(fd, msg + '\n');
++  } catch (e) {}
++}
+ var LoginBaseResults = /*#__PURE__*/function (LoginBaseResults) {
+   LoginBaseResults["Success"] = "SUCCESS";
+   LoginBaseResults["UnknownError"] = "UNKNOWN_ERROR";
+@@ -53,6 +67,25 @@ async function getKeyByValue(object, value, page) {
    }
    return Promise.resolve(LoginResults.UnknownError);
  }
@@ -173,7 +194,7 @@ index 4c13609..1bfcf26 100644
  function createGeneralError() {
    return {
      success: false,
-@@ -240,7 +259,7 @@ class BaseScraperWithBrowser extends _baseScraper.BaseScraper {
+@@ -240,7 +273,7 @@ class BaseScraperWithBrowser extends _baseScraper.BaseScraper {
        await (0, _navigation.waitForNavigation)(this.page);
      }
      debug('check login result');
@@ -182,7 +203,7 @@ index 4c13609..1bfcf26 100644
      const loginResult = await getKeyByValue(loginOptions.possibleResults, current, this.page);
      debug(`handle login results ${loginResult}`);
      return this.handleLoginResult(loginResult);
-@@ -250,10 +269,28 @@ class BaseScraperWithBrowser extends _baseScraper.BaseScraper {
+@@ -250,10 +283,30 @@ class BaseScraperWithBrowser extends _baseScraper.BaseScraper {
      this.emitProgress(_definitions.ScraperProgressTypes.Terminating);
      if (!_success && !!this.options.storeFailureScreenShotPath) {
        debug(`create a snapshot before terminated in ${this.options.storeFailureScreenShotPath}`);
@@ -202,6 +223,7 @@ index 4c13609..1bfcf26 100644
 +            path: this.options.storeFailureScreenShotPath,
 +            fullPage: true
 +          });
++          _publicLog(`screenshot captured at ${this.options.storeFailureScreenShotPath}`);
 +          break;
 +        } catch (e) {
 +          const msg = e && e.message || '';
@@ -209,6 +231,7 @@ index 4c13609..1bfcf26 100644
 +            continue;
 +          }
 +          debug(`failed to capture failure screenshot: ${msg}`);
++          _publicLog(`failed to capture failure screenshot: ${msg}`);
 +          break;
 +        }
 +      }
