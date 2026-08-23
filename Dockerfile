@@ -24,7 +24,7 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        chromium libnss3 \
+        chromium libnss3 ca-certificates \
         fonts-noto-core fonts-noto-unhinted \
         libatk-bridge2.0-0 libgtk-3-0 libdrm2 libgbm1 \
         libx11-xcb1 libxcomposite1 libxdamage1 libxfixes3 libxkbcommon0 libxrandr2 \
