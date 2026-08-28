@@ -21,7 +21,7 @@ index efd9183..0111eae 100644
  async function setValue(pageOrFrame, inputSelector, inputValue) {
    await pageOrFrame.$eval(inputSelector, (input, value) => {
 diff --git a/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js b/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
-index 4e821fa..3b9ffc2 100644
+index 4e821fa..3f9e788 100644
 --- a/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
 +++ b/node_modules/israeli-bank-scrapers/lib/scrapers/base-beinleumi-group.js
 @@ -60,6 +60,7 @@ function createLoginFields(credentials) {
@@ -59,16 +59,27 @@ index 4e821fa..3b9ffc2 100644
    const noTransactionInRangeError = await isNoTransactionInDateRangeError(page);
    if (noTransactionInRangeError) {
      return [];
-@@ -220,7 +221,7 @@ async function getAccountTransactions(page, options) {
+@@ -219,8 +220,17 @@ async function getAccountTransactions(page, options) {
+   return txns;
  }
  async function getCurrentBalance(page) {
-   // Wait for the balance element to appear and be visible
+-  // Wait for the balance element to appear and be visible
 -  await (0, _elementsInteractions.waitUntilElementFound)(page, CURRENT_BALANCE, true, ELEMENT_RENDER_TIMEOUT_MS);
-+  await waitForSelectorResilientToNavigation(page, CURRENT_BALANCE, true, ELEMENT_RENDER_TIMEOUT_MS);
++  // Wait for the balance element to appear and be visible. The newer
++  // "appsng" Angular UI doesn't render `.main_balance` at all (same class
++  // of issue already handled for post-login detection above) - rather than
++  // letting an unknown/missing balance element abort the whole account
++  // fetch (and with it, every transaction), treat a failed/timed-out wait
++  // as "balance unavailable" and let the caller continue without it.
++  try {
++    await waitForSelectorResilientToNavigation(page, CURRENT_BALANCE, true, ELEMENT_RENDER_TIMEOUT_MS);
++  } catch (e) {
++    return undefined;
++  }
  
    // Extract text content
    const balanceStr = await page.$eval(CURRENT_BALANCE, el => {
-@@ -228,15 +229,63 @@ async function getCurrentBalance(page) {
+@@ -228,15 +238,63 @@ async function getCurrentBalance(page) {
    });
    return getAmountData(balanceStr);
  }
@@ -137,7 +148,7 @@ index 4e821fa..3b9ffc2 100644
  }
  async function fetchAccountData(page, startDate, options) {
    const accountNumber = await getAccountNumber(page);
-@@ -250,12 +299,26 @@ async function fetchAccountData(page, startDate, options) {
+@@ -250,12 +308,26 @@ async function fetchAccountData(page, startDate, options) {
    };
  }
  async function getAccountIdsOldUI(page) {
@@ -170,7 +181,7 @@ index 4e821fa..3b9ffc2 100644
  }
  
  /**
-@@ -421,7 +484,19 @@ class BeinleumiGroupBaseScraper extends _baseScraperWithBrowser.BaseScraperWithB
+@@ -421,7 +493,19 @@ class BeinleumiGroupBaseScraper extends _baseScraperWithBrowser.BaseScraperWithB
      });
      const startDate = this.options.startDate || defaultStartMoment.toDate();
      const startMoment = _moment.default.max(startMomentLimit, (0, _moment.default)(startDate));
