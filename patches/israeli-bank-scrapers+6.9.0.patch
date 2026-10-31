@@ -288,10 +288,11 @@ index 901eba8..e49a683 100644
      default:
        switch (planTypeId) {
          case 2:
-
+diff --git a/node_modules/israeli-bank-scrapers/lib/scrapers/base-isracard-amex.js b/node_modules/israeli-bank-scrapers/lib/scrapers/base-isracard-amex.js
+index 8125550..0e441fe 100644
 --- a/node_modules/israeli-bank-scrapers/lib/scrapers/base-isracard-amex.js
 +++ b/node_modules/israeli-bank-scrapers/lib/scrapers/base-isracard-amex.js
-@@ -28,6 +28,36 @@
+@@ -28,6 +28,36 @@ const ID_TYPE = '1';
  const INSTALLMENTS_KEYWORD = 'תשלום';
  const DATE_FORMAT = 'DD/MM/YYYY';
  const debug = (0, _debug.getDebug)('base-isracard-amex');
@@ -328,7 +329,7 @@ index 901eba8..e49a683 100644
  function getAccountsUrl(servicesUrl, monthMoment) {
    const billingDate = monthMoment.format('YYYY-MM-DD');
    const url = new URL(servicesUrl);
-@@ -270,7 +300,7 @@
+@@ -270,7 +300,7 @@ class IsracardAmexBaseScraper extends _baseScraperWithBrowser.BaseScraperWithBro
        companyCode: this.companyCode
      };
      debug('logging in with validate request');
