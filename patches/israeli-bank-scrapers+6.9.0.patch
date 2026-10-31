@@ -288,3 +288,52 @@ index 901eba8..e49a683 100644
      default:
        switch (planTypeId) {
          case 2:
+
+--- a/node_modules/israeli-bank-scrapers/lib/scrapers/base-isracard-amex.js
++++ b/node_modules/israeli-bank-scrapers/lib/scrapers/base-isracard-amex.js
+@@ -28,6 +28,36 @@
+ const INSTALLMENTS_KEYWORD = 'תשלום';
+ const DATE_FORMAT = 'DD/MM/YYYY';
+ const debug = (0, _debug.getDebug)('base-isracard-amex');
++// The ValidateIdData login call has occasionally come back with an empty
++// (but 200 OK, not rate-limited) response body - fetchPostWithinPage then
++// throws "Unexpected end of JSON input" trying to parse it, which aborted
++// the whole login outright. Seen specifically on Amex (he.americanexpress
++// co.il), not on Isracard's own domain, even though both share this exact
++// code path - consistent with Amex's side having its own, stricter
++// automated-traffic handling that occasionally no-ops a request instead of
++// serving it, rather than a bug in the request itself (the same id/
++// cardSuffix/companyCode shape that works for Isracard is being sent).
++// Retrying after a short pause is a safe, non-destructive mitigation for
++// that either way - a genuine credential/auth problem still surfaces
++// immediately, since only this specific empty-body failure is retried.
++async function fetchValidateIdDataWithRetry_(page, url, data, maxAttempts = 4) {
++  let lastError;
++  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
++    try {
++      return await (0, _fetch.fetchPostWithinPage)(page, url, data);
++    } catch (e) {
++      lastError = e;
++      const msg = e && e.message || '';
++      if (!msg.includes('fetchPostWithinPage parse error')) {
++        throw e; // a different failure (blocked, network, etc.) - don't mask it with retries
++      }
++      if (attempt === maxAttempts) break;
++      debug(`ValidateIdData returned an empty/unparseable body (attempt ${attempt}/${maxAttempts}) - retrying shortly`);
++      await new Promise(resolve => setTimeout(resolve, 1500 + attempt * 1000));
++    }
++  }
++  throw lastError;
++}
+ function getAccountsUrl(servicesUrl, monthMoment) {
+   const billingDate = monthMoment.format('YYYY-MM-DD');
+   const url = new URL(servicesUrl);
+@@ -270,7 +300,7 @@
+       companyCode: this.companyCode
+     };
+     debug('logging in with validate request');
+-    const validateResult = await (0, _fetch.fetchPostWithinPage)(this.page, validateUrl, validateRequest);
++    const validateResult = await fetchValidateIdDataWithRetry_(this.page, validateUrl, validateRequest);
+     if (!validateResult || !validateResult.Header || validateResult.Header.Status !== '1' || !validateResult.ValidateIdDataBean) {
+       throw new Error('unknown error during login');
+     }
