@@ -79,7 +79,7 @@ index 4e821fa..3f9e788 100644
  
    // Extract text content
    const balanceStr = await page.$eval(CURRENT_BALANCE, el => {
-@@ -228,15 +238,63 @@ async function getCurrentBalance(page) {
+@@ -228,15 +238,69 @@ async function getCurrentBalance(page) {
    });
    return getAmountData(balanceStr);
  }
@@ -94,12 +94,18 @@ index 4e821fa..3f9e788 100644
 +      await (0, _elementsInteractions.waitUntilElementFound)(page, selector, onlyVisible, Math.min(remaining, 5000));
 +      return;
 +    } catch (e) {
-+      const msg = e && e.message || '';
-+      // A post-login redirect chain can destroy the page's execution context or
-+      // detach the node mid-poll. That's a normal part of navigating to the
-+      // logged-in page, not a real failure - keep polling until the overall
-+      // deadline instead of letting one transient rejection abort the whole race.
-+      if (msg.includes('Execution context was destroyed') || msg.includes('Node is detached from document') || msg.includes('waiting for selector')) {
++      const msg = (e && e.message || '').toLowerCase();
++      // A post-login redirect chain can destroy the page's execution context,
++      // detach the node/frame mid-poll, or simply make this 5s slice of the
++      // wait time out before the UI has settled. All of that is a normal
++      // part of navigating to the logged-in page, not a real failure - keep
++      // polling until the overall deadline instead of letting one transient
++      // rejection abort the whole race. Match lowercased: Puppeteer's own
++      // messages ("Waiting for selector ... failed", "Attempted to use
++      // detached Frame ...") capitalize differently than the checks below
++      // used to assume, which let them slip through as real failures after
++      // a single 5s slice instead of being retried.
++      if (msg.includes('execution context was destroyed') || msg.includes('detached') || msg.includes('waiting for selector')) {
 +        continue;
 +      }
 +      throw e;
